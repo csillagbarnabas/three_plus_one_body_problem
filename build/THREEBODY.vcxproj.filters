@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\Csillag Barnabás\Desktop\tanulás\cpp_codes\3_p1_body_problem\three_plus_one_body_problem\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Csillag Barnabás\Desktop\tanulás\cpp_codes\3_p1_body_problem\three_plus_one_body_problem\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{FF805AE9-EE06-3124-BA10-0D847F79C9F7}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Csillag Barnabás\Desktop\tanulás\cpp_codes\3_p1_body_problem\three_plus_one_body_problem\build\CMakeFiles\d35317d422d2d95583ea5f887a301605\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{C06B94D4-FF7F-3E16-B23D-DCEC4B4C750D}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

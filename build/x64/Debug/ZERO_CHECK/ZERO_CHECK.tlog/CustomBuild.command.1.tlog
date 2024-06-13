@@ -1,0 +1,10 @@
+^C:\USERS\CSILLAG BARNABÁS\DESKTOP\TANULÁS\CPP_CODES\3_P1_BODY_PROBLEM\THREE_PLUS_ONE_BODY_PROBLEM\BUILD\CMAKEFILES\D35317D422D2D95583EA5F887A301605\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" "-SC:/Users/Csillag Barnabás/Desktop/tanulás/cpp_codes/3_p1_body_problem/three_plus_one_body_problem" "-BC:/Users/Csillag Barnabás/Desktop/tanulás/cpp_codes/3_p1_body_problem/three_plus_one_body_problem/build" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/Csillag Barnabás/Desktop/tanulás/cpp_codes/3_p1_body_problem/three_plus_one_body_problem/build/THREEBODY.sln"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
