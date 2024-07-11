@@ -11,30 +11,11 @@ const double G = 6.6743*1.98892*3.1536*3.1536/(1.496*1.496*1.496);
 
 const double m1 = 3, m2 = 2, m3 = 5; //in units of the Sun's mass
 
-template<typename T, typename F>
-std::vector<T> multiply(std::vector<T> & x, const F y){
-    std::vector<T> res(x.size());
-    for(int i = 0; i<x.size();i++){res[i] = x[i]*y;}
-    return res;
-}
-
-template<typename T, typename F>
-std::vector<T> add(std::vector<T> & x,std::vector<F> & y){
-    std::vector<T> res(x.size());
-    //for(int i = 0; i<x.size();i++){res[i] = x[i]+y[i];}
-    std::transform(begin(x), end(x), begin(y),std::begin(res),[](T a,F b) { return a + b; });
-    return res;
-}
-
 template<typename T>
 class orbit_vector{
 	int N;
     std::vector<T> data;
 	public:
-    //T *t, *x1, *y1, *v_x1, *v_y1, *x2, *y2, *v_x2, *v_y2, *x3, *y3, *v_x3, *v_y3;
-    //t = &data[0], x1 = &data[1], y1 = &data[2], v_x1 = &data[3], v_y1 = &data[4];
-    //x2 = &data[5], y2 = &data[6], v_x2 = &data[7], v_y2 = &data[8];
-    //x3 = &data[9], y3 = &data[10], v_x3 = &data[11], v_y3 = &data[12];
     T&  operator()(int i)
     	{ return data[i]; }
     T const& operator()(int i) const
@@ -59,19 +40,26 @@ class orbit_vector{
 		}
 	}
     orbit_vector( int n, std::vector<T> const& x ) : N(n), data(x){};
-    int Nsize()const{
-		return N;
-		}
-
+    int Nsize()const{return N;}
+    auto begin(){return data.begin();}
+	auto cbegin() const{return data.cbegin();}
+	auto end(){return data.end();}
+	auto cend() const{return data.cend();}
 };
 
 template<typename T>
 orbit_vector<T> operator+(orbit_vector<T> const& A, orbit_vector<T> const& B)
 {
     orbit_vector<T> res{A.Nsize(),std::vector<T> (A.Nsize(), 0.0)};
-    for(int i = 0; i<A.Nsize(); i++){
-        res[i] = A[i]+B[i];
-    }
+    for(int i = 0; i<A.Nsize(); i++){res[i] = A[i]+B[i];}
+	return res;
+}
+
+template<typename T>
+orbit_vector<T> operator-(orbit_vector<T> const& A, orbit_vector<T> const& B)
+{
+    orbit_vector<T> res{A.Nsize(),std::vector<T> (A.Nsize(), 0.0)};
+    for(int i = 0; i<A.Nsize(); i++){res[i] = A[i]-B[i];}
 	return res;
 }
 
@@ -79,236 +67,174 @@ template<typename T>
 orbit_vector<T> operator*(orbit_vector<T> const& A,T const C)
 {
     orbit_vector<T> res{A.Nsize(),std::vector<T> (A.Nsize(), 0.0)};
-    for(int i = 0; i<A.Nsize(); i++){
-        res[i] = A[i]*C;
-    }
+    for(int i = 0; i<A.Nsize(); i++){res[i] = A[i]*C;}
 	return res;
 }
 
-template<typename T, typename F, typename RHS>
-void RK4Step(std::vector<T>& z, F h, RHS derivs)
-{
-    std::vector<T> k1 = multiply(derivs(z),h);
-    std::vector<T> k2 = multiply(derivs(add(z,multiply(k1,0.5))),h);
-    std::vector<T> k3 = multiply(derivs(add(z,multiply(k2,0.5))),h);
-    std::vector<T> k4 = multiply(derivs(add(z,k3)),h);
-    z = add(z,multiply(add(add(k1, multiply(k2,2)), add(multiply(k3,2), k4)),1.0/6.0));
+template<typename T>
+std::vector<T> acc(orbit_vector<T>& V){
+    double x12 = V[1]-V[3];
+    double y12 = V[2]-V[4];
+    double rSquared_12 = x12*x12 + y12*y12;
+    double rCubed_12 = rSquared_12 * std::sqrt(rSquared_12);
+    double x13 = V[1]-V[5];
+    double y13 = V[2]-V[6];
+    double rSquared_13 = x13*x13 + y13*y13;
+    double rCubed_13 = rSquared_13 * std::sqrt(rSquared_13);
+    double x23 = V[3]-V[5];
+    double y23 = V[4]-V[6];
+    double rSquared_23 = x23*x23 + y23*y23;
+    double rCubed_23 = rSquared_23 * std::sqrt(rSquared_23);
+
+    double ax12 = x12 / rCubed_12;
+    double ax13 = x13 / rCubed_13;
+    double ax23 = x23 / rCubed_23;
+
+    double ay12 = y12 / rCubed_12;
+    double ay13 = y13 / rCubed_13;
+    double ay23 = y23 / rCubed_23;
+
+    double ax_1 = - G * (m2 * ax12 + m3 * ax13);
+    double ay_1 = - G * (m2 * ay12 + m3 * ay13);
+
+    double ax_2 = G * (m1 * ax12 - m3 * ax23);
+    double ay_2 = G * (m1 * ay12 - m3 * ay23);
+
+    double ax_3 = G * (m1 * ax13 + m2 * ax23);
+    double ay_3 = G * (m1 * ay13 + m2 * ay23);
+    std::vector<T> acc{ax_1,ay_1,ax_2,ay_2,ax_3,ay_3};
+    return acc;
 }
 
-template<typename T, typename F, typename RHS>
-void RK4Step_3body(orbit_vector<T>& z, F h, RHS derivs,
-    orbit_vector<T>& k1,orbit_vector<T>& k2,orbit_vector<T>& k3,orbit_vector<T>& k4)
-{
-    k1 = derivs(z)*h;
-    k2 = derivs((z+(k1*0.5)))*h;
-    k3 = derivs((z+(k2*0.5)))*h;
-    k4 = derivs((z+k3))*h;
-    z = z+(k1 + (k2*2.0) + (k3*2.0)+ k4)*(1.0/6.0);
-    //exit(-1);
+template<typename T>
+void accel(orbit_vector<T>& V,std::vector<T>& acce){
+    double x12 = V[1]-V[3];
+    double y12 = V[2]-V[4];
+    double rSquared_12 = x12*x12 + y12*y12;
+    double rCubed_12 = rSquared_12 * std::sqrt(rSquared_12);
+    double x13 = V[1]-V[5];
+    double y13 = V[2]-V[6];
+    double rSquared_13 = x13*x13 + y13*y13;
+    double rCubed_13 = rSquared_13 * std::sqrt(rSquared_13);
+    double x23 = V[3]-V[5];
+    double y23 = V[4]-V[6];
+    double rSquared_23 = x23*x23 + y23*y23;
+    double rCubed_23 = rSquared_23 * std::sqrt(rSquared_23);
+
+    double ax12 = x12 / rCubed_12;
+    double ax13 = x13 / rCubed_13;
+    double ax23 = x23 / rCubed_23;
+
+    double ay12 = y12 / rCubed_12;
+    double ay13 = y13 / rCubed_13;
+    double ay23 = y23 / rCubed_23;
+
+    acce[0] = - G * (m2 * ax12 + m3 * ax13);
+    acce[1] = - G * (m2 * ay12 + m3 * ay13);
+
+    acce[2] = G * (m1 * ax12 - m3 * ax23);
+    acce[3] = G * (m1 * ay12 - m3 * ay23);
+
+    acce[4] = G * (m1 * ax13 + m2 * ax23);
+    acce[5] = G * (m1 * ay13 + m2 * ay23);
 }
 
-template<typename T, typename F, typename L, typename RHS>
-void adaptiveRK4Step(orbit_vector<T>& x, F tau, L accuracy, RHS derivs, orbit_vector<T>& x_half,
-    orbit_vector<T>& x_full, orbit_vector<T>& Delta, orbit_vector<T>& scale,
-    orbit_vector<T>& k1,orbit_vector<T>& k2,orbit_vector<T>& k3,orbit_vector<T>& k4)
-{
-    const double SAFETY = 0.9, PGROW = -0.2, PSHRINK = -0.25,
-                 ERRCON = 1.89E-4, TINY = 1.0e-30;
-    const int n = int(x.Nsize());
-    for (int i = 0; i < n; i++)
-        scale[i] = abs(x[i]) + abs(scale[i] * tau) + TINY;
-    double err_max;
-    while (true) {
-        // take two half steps
-        double tau_half = tau / 2;
-        x_half = x;
-        RK4Step_3body(x_half, tau_half, derivs,k1,k2,k3,k4);
-        RK4Step_3body(x_half, tau_half, derivs,k1,k2,k3,k4);
-        // take full step
-        x_full = x;
-        RK4Step_3body(x_full, tau, derivs,k1,k2,k3,k4);
-        // estimate error
-        for(int i = 0; i < n; i++){
-            Delta[i] = x_half[i] - x_full[i];
-        }
-        err_max = 0;
-        for (int i = 0; i < n; i++)
-            err_max = std::max(err_max, std::abs(Delta[i]) / scale[i]);
-        err_max /= accuracy;
-        if (err_max <= 1.0)
-            break;
-        double tau_temp = SAFETY * tau * pow(err_max, PSHRINK);
-        if (tau >= 0.0)
-            tau = std::max(tau_temp, 0.1 * tau);
-        else
-            tau = std::min(tau_temp, 0.1 * tau);
-        if (std::abs(tau) == 0.0) {
-            std::cerr << "adaptiveRK4Step: step size underflow\naborting ..."
-                 << std::endl;
-            exit(EXIT_FAILURE);
-        }
+template<typename T>
+std::vector<T> acc4(orbit_vector<T>& V){
+    double x14 = V[1]-V[13];
+    double y14 = V[2]-V[14];
+    double rSquared_14 = x14*x14 + y14*y14;
+    double rCubed_14 = rSquared_14 * std::sqrt(rSquared_14);
+    double x24 = V[3]-V[13];
+    double y24 = V[4]-V[14];
+    double rSquared_24 = x24*x24 + y24*y24;
+    double rCubed_24 = rSquared_24 * std::sqrt(rSquared_24);
+    double x34 = V[5]-V[13];
+    double y34 = V[6]-V[14];
+    double rSquared_34 = x34*x34 + y34*y34;
+    double rCubed_34 = rSquared_34 * std::sqrt(rSquared_34);
+
+    double ax14 = x14 / rCubed_14;
+    double ax24 = x24 / rCubed_24;
+    double ax34 = x34 / rCubed_34;
+
+    double ay14 = y14 / rCubed_14;
+    double ay24 = y24 / rCubed_24;
+    double ay34 = y34 / rCubed_34;
+
+    double ax4 = G * (m1 * ax14 + m2 * ax24 + m3 * ax34);
+    double ay4 = G * (m1 * ay14 + m2 * ay24 + m3 * ay34);
+    std::vector<T> acc4{ax4,ay4};
+    return acc4;
+}
+
+
+template<typename T, typename F>
+void velocity_verlet(orbit_vector<T>& A, F h,std::vector<T>& ac0,std::vector<T>& ac1){
+    accel(A,ac0);
+    std::vector<T> a41(2);
+    if(A.Nsize() == 17){
+        a41 = acc4(A);
+        A[13] = A[13]+h*A[15]+h*h*a41[0]/2;
+        A[14] = A[14]+h*A[16]+h*h*a41[1]/2;
     }
-    tau *= (err_max > ERRCON ? SAFETY * pow(err_max, PGROW) : 5.0);
-    for(int i=0; i < n; i++){
-        x[i] = x_half[i] + Delta[i] / 15.0;
+    for (int i = 0; i < 6; i++){A[i+1]  = A[i+1]+h*A[i+7]+h*h*ac0[i]/2;}
+    accel(A,ac1);
+    for (int i = 0; i < 6; i++){A[i+7] = A[i+7]+h*(ac0[i]+ac1[i])/2;}
+    if(A.Nsize() == 17){
+        std::vector<T> a42 = acc4(A);
+        A[15] = A[15]+h*(a41[0] + a42[0])/2;
+        A[16] = A[16]+h*(a41[1] + a42[1])/2;
     }
+    A[0] = A[0] + h;
 }
 
-//  Derivative vector for Newton's law of gravitation for 2 body:
-std::vector<double> N2(const std::vector<double>& z) 
-{
-    double t = z[0], x1 = z[1], y1 = z[2], v_x1 = z[3], v_y1 = z[4];
-    double x2 = z[5], y2 = z[6], v_x2 = z[7], v_y2 = z[8];
-    double x12 = x1-x2;
-    double y12 = y1-y2;
-    double rSquared_ij = x12*x12 + y12*y12;
-    double rCubed_ij = rSquared_ij * std::sqrt(rSquared_ij);
-    double ax_ij = - G * m2 * x12 / rCubed_ij;
-    double ay_ij = - G * m2 * y12 / rCubed_ij;
-    std::vector<double> N2{1,v_x1,v_y1,ax_ij,ay_ij,v_x2,v_y2,- ax_ij*(m1/m2),- ay_ij*(m1/m2)};
-    return N2;
-}
-
-//  Derivative vector for Newton's law of gravitation for 3 body:
-std::vector<double> N3(const std::vector<double>& z) 
-{
-    double t = z[0], x1 = z[1], y1 = z[2], v_x1 = z[3], v_y1 = z[4];
-    double x2 = z[5], y2 = z[6], v_x2 = z[7], v_y2 = z[8];
-    double x3 = z[9], y3 = z[10], v_x3 = z[11], v_y3 = z[12];
-
-    double x12 = x1-x2;
-    double y12 = y1-y2;
-    double rSquared_12 = x12*x12 + y12*y12;
-    double rCubed_12 = rSquared_12 * std::sqrt(rSquared_12);
-    double x13 = x1-x3;
-    double y13 = y1-y3;
-    double rSquared_13 = x13*x13 + y13*y13;
-    double rCubed_13 = rSquared_13 * std::sqrt(rSquared_13);
-    double x23 = x2-x3;
-    double y23 = y2-y3;
-    double rSquared_23 = x23*x23 + y23*y23;
-    double rCubed_23 = rSquared_23 * std::sqrt(rSquared_23);
-
-    double ax12 = x12 / rCubed_12;
-    double ax13 = x13 / rCubed_13;
-    double ax23 = x23 / rCubed_23;
-
-    double ay12 = y12 / rCubed_12;
-    double ay13 = y13 / rCubed_13;
-    double ay23 = y23 / rCubed_23;
-
-    double ax_1 = - G * (m2 * ax12 + m3 * ax13);
-    double ay_1 = - G * (m2 * ay12 + m3 * ay13);
-
-    double ax_2 = G * (m1 * ax12 - m3 * ax23);
-    double ay_2 = G * (m1 * ay12 - m3 * ay23);
-
-    double ax_3 = G * (m1 * ax13 + m2 * ax23);
-    double ay_3 = G * (m1 * ay13 + m2 * ay23);
-    
-    std::vector<double> N3{1,v_x1,v_y1,ax_1,ay_1,v_x2,v_y2,ax_2,ay_2,v_x3,v_y3,ax_3,ay_3};
-    return N3;
-}
-
-std::vector<double> N3_efficient(const std::vector<double>& z) 
-{
-    double x12 = z[1]-z[5];
-    double y12 = z[2]-z[6];
-    double rSquared_12 = x12*x12 + y12*y12;
-    double rCubed_12 = rSquared_12 * std::sqrt(rSquared_12);
-    double x13 = z[1]-z[9];
-    double y13 = z[2]-z[10];
-    double rSquared_13 = x13*x13 + y13*y13;
-    double rCubed_13 = rSquared_13 * std::sqrt(rSquared_13);
-    double x23 = z[5]-z[9];
-    double y23 = z[6]-z[10];
-    double rSquared_23 = x23*x23 + y23*y23;
-    double rCubed_23 = rSquared_23 * std::sqrt(rSquared_23);
-
-    double ax12 = x12 / rCubed_12;
-    double ax13 = x13 / rCubed_13;
-    double ax23 = x23 / rCubed_23;
-
-    double ay12 = y12 / rCubed_12;
-    double ay13 = y13 / rCubed_13;
-    double ay23 = y23 / rCubed_23;
-
-    double ax_1 = - G * (m2 * ax12 + m3 * ax13);
-    double ay_1 = - G * (m2 * ay12 + m3 * ay13);
-
-    double ax_2 = G * (m1 * ax12 - m3 * ax23);
-    double ay_2 = G * (m1 * ay12 - m3 * ay23);
-
-    double ax_3 = G * (m1 * ax13 + m2 * ax23);
-    double ay_3 = G * (m1 * ay13 + m2 * ay23);
-    
-    std::vector<double> N3_efficient{1,z[3],z[4],ax_1,ay_1,z[7],z[8],ax_2,ay_2,z[11],z[12],ax_3,ay_3};
-    return N3_efficient;
-}
-
-orbit_vector<double> N3o_efficient(const orbit_vector<double>& V) 
-{
-    double x12 = V[1]-V[5];
-    double y12 = V[2]-V[6];
-    double rSquared_12 = x12*x12 + y12*y12;
-    double rCubed_12 = rSquared_12 * std::sqrt(rSquared_12);
-    double x13 = V[1]-V[9];
-    double y13 = V[2]-V[10];
-    double rSquared_13 = x13*x13 + y13*y13;
-    double rCubed_13 = rSquared_13 * std::sqrt(rSquared_13);
-    double x23 = V[5]-V[9];
-    double y23 = V[6]-V[10];
-    double rSquared_23 = x23*x23 + y23*y23;
-    double rCubed_23 = rSquared_23 * std::sqrt(rSquared_23);
-
-    double ax12 = x12 / rCubed_12;
-    double ax13 = x13 / rCubed_13;
-    double ax23 = x23 / rCubed_23;
-
-    double ay12 = y12 / rCubed_12;
-    double ay13 = y13 / rCubed_13;
-    double ay23 = y23 / rCubed_23;
-
-    double ax_1 = - G * (m2 * ax12 + m3 * ax13);
-    double ay_1 = - G * (m2 * ay12 + m3 * ay13);
-
-    double ax_2 = G * (m1 * ax12 - m3 * ax23);
-    double ay_2 = G * (m1 * ay12 - m3 * ay23);
-
-    double ax_3 = G * (m1 * ax13 + m2 * ax23);
-    double ay_3 = G * (m1 * ay13 + m2 * ay23);
-    
-    orbit_vector<double> N3o_efficient{V.Nsize(),{1,V[3],V[4],ax_1,ay_1,V[7],
-    V[8],ax_2,ay_2,V[11],V[12],ax_3,ay_3}};
-    return N3o_efficient;
+template<typename T>
+void time_reversal(orbit_vector<T>& A){
+    for (int i = 0; i < 6; i++){A[i+7] = - A[i+7];}
+    A[15] = -A[15];
+    A[16] = -A[16];
 }
 
 int main()
 {
     auto t1 = std::chrono::high_resolution_clock::now();
-    double x1 = 6, y1 = 0, x2 = -7, y2 = 0, x3 = 0, y3 = 20; // Astronomical unit - AU
-    double v_x1=0.3,v_y1=1.02,v_x2=0.2,v_y2=-1.3,v_x3=4,v_y3 = 0; // AU / Earth years
-    orbit_vector<double> z{13,{0,x1,y1,v_x1,v_y1,x2,y2,v_x2,v_y2,x3,y3,v_x3,v_y3}};
-    const double h = 0.008;
-    const double accuracy = 1e-7;
-    const std::string filename = "3body-test.dat";
+
+    //my initial test parameters
+    double v_add = 0.4;
+    double x1 = 16, y1 = 5, x2 = -12, y2 = 0, x3 = 0, y3 = 20; // Astronomical unit - AU
+    double v_x1=0.3+v_add,v_y1=1.02,v_x2=0.4+v_add,v_y2=1.1,v_x3=3.5+v_add,v_y3 = 0; // AU / Earth years
+    double x4 = x2+1.5, y4 = y2, v_x4 = -0.55, v_y4 = -6;
+
+    //Lagrange solution test
+    //const double a = 20;
+    //const double v0 = 0.5;
+    //double x1=0,y1=a,x2=std::sqrt(3)*a/2,y2=-a/2,x3=-std::sqrt(3)*a/2,y3=-a/2; // Astronomical unit - AU
+    //double v_x1=-v0,v_y1=0,v_x2=v0/2,v_y2=std::sqrt(3)*v0/2,v_x3=v0/2,v_y3=-std::sqrt(3)*v0/2; // AU / Earth years
+    //double x4 = 0, y4 = y1 + 3, v_x4 = -6.5, v_y4 = 0;
+
+    //orbit_vector<double> z{13,{0,x1,y1,x2,y2,x3,y3,v_x1,v_y1,v_x2,v_y2,v_x3,v_y3}};
+    orbit_vector<double> z{17,{0,x1,y1,x2,y2,x3,y3,v_x1,v_y1,v_x2,v_y2,v_x3,v_y3,x4,y4,v_x4,v_y4}};
+    double h = 1e-4;
+    const std::string filename = "3p1body-VV2_myparams_tr_test.dat";
+    //const std::string filename = "3body-RK4a_lagrange.dat";
     const int number_of_steps = 10000;
-    orbit_vector<double> k1{z.Nsize(),std::vector<double> (z.Nsize(), 0.0)};
-    orbit_vector<double> k2{z.Nsize(),std::vector<double> (z.Nsize(), 0.0)};
-    orbit_vector<double> k3{z.Nsize(),std::vector<double> (z.Nsize(), 0.0)};
-    orbit_vector<double> k4{z.Nsize(),std::vector<double> (z.Nsize(), 0.0)};
-    orbit_vector<double> x_half{z.Nsize(),std::vector<double> (z.Nsize(), 0.0)};
-    orbit_vector<double> x_full{z.Nsize(),std::vector<double> (z.Nsize(), 0.0)};
-    orbit_vector<double> Delta{z.Nsize(),std::vector<double> (z.Nsize(), 0.0)};
-    orbit_vector<double> scale{z.Nsize(),std::vector<double> (z.Nsize(), 0.0)};
-    std::cout << " 3+1 body simulation\n";
+    std::vector<double> ac0(6);
+    std::vector<double> ac1(6);
+    std::cout << "3 body simulation\n";
     std::ofstream dataFile(filename);
     for (int step = 0; step < number_of_steps; step++){
-        //RK4Step_3body(z,h,N3o_efficient,k1,k2,k3,k4);
-        adaptiveRK4Step(z, h, accuracy, N3o_efficient, x_half, x_full, Delta, scale, k1,k2,k3,k4);
+        velocity_verlet(z,h,ac0,ac1);
         for (int j = 0; j < z.Nsize(); j++){
             dataFile << z[j] << '\t';}
         dataFile << '\n';}
+    if(true){
+        time_reversal(z);
+        for (int step = 0; step < number_of_steps; step++){
+            velocity_verlet(z,h,ac0,ac1);
+            for (int j = 0; j < z.Nsize(); j++){
+                dataFile << z[j] << '\t';}
+            dataFile << '\n';}}
     dataFile.close();
     auto t2 = std::chrono::high_resolution_clock::now();
     std::cout << "Computation time:\n";
